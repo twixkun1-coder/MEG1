@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Princess Game</title>
+<style>
+body {
+  margin: 0;
+  font-family: 'Comic Sans MS', cursive, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #ffb6c1;
+}
+.question-box {
+  background: rgba(255,255,255,0.95);
+  padding: 2rem;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+  transition: all 0.5s ease;
+}
+h1,h2 { color: #444; margin-bottom: 20px; }
+.buttons { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+button {
+  flex: 1;
+  padding: 15px;
+  font-size: 18px;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: transform 0.3s, background 0.3s;
+}
+.yes { background: #ff99c8; color: white; }
+.no { background: #a0c4ff; color: white; position: absolute; z-index: 3; }
+.hidden { display: none; }
+.hearts { position: fixed; top: 10px; right: 10px; font-size: 30px; display: flex; gap: 5px; z-index: 1000; }
+.heart { display: inline-block; transition: transform 0.3s, opacity 0.3s; }
+@keyframes loseHeartAnim { 0% { transform: scale(1) rotate(0deg); opacity:1; } 50% { transform: scale(1.5) rotate(20deg); opacity:0.5; } 100% { transform: scale(0) rotate(-20deg); opacity:0; } }
+.lost { animation: loseHeartAnim 0.5s forwards; }
+@keyframes bounce { 0% { transform: scale(1); } 25% { transform: scale(1.2); } 50% { transform: scale(0.9); } 75% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.bounce { animation: bounce 1s ease-in-out infinite; }
+.floating { position: fixed; z-index: 999; pointer-events:none; }
+.hint-box { position:absolute; top:10px; right:10px; background:white; padding:5px; border-radius:5px; font-size:12px; }
+.muteBtn {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 2000;
+  padding: 5px 10px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.8);
+  border: none;
+  cursor: pointer;
+}
+@media(max-width:600px){ button { font-size: 16px; padding: 10px; } }
+#candyContainer { position: relative; width: 100%; height: 60vh; overflow: hidden; }
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 20px;
+}
+.memory-card {
+  background: #fff;
+  border-radius: 10px;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  cursor: pointer;
+  user-select: none;
+  border: 2px solid #ccc;
+  transition: transform 0.3s;
+}
+.memory-card.flipped { background: #ff99c8; color: #fff; transform: rotateY(180deg);}
+</style>
+</head>
+<body>
+
+<!-- Background Music -->
+<audio id="bgMusic" src="https://lit2talks.com/tool/uploads/68c736734248d_cutie-japan-lofi-402355.mp3" loop></audio>
+<button class="muteBtn" id="muteBtn">🔈</button>
+
+<!-- Sounds -->
+<audio id="clickSnd" src="https://www.soundjay.com/button/sounds/button-3.mp3"></audio>
+<audio id="correctSnd" src="https://www.soundjay.com/button/sounds/button-10.mp3"></audio>
+<audio id="wrongSnd" src="https://www.soundjay.com/button/sounds/button-09.mp3"></audio>
+<audio id="collectSnd" src="https://www.soundjay.com/misc/sounds/coin-drop-2.mp3"></audio>
+
+<!-- Hearts -->
+<div class="hearts" id="hearts">
+  <span class="heart">❤️</span>
+  <span class="heart">❤️</span>
+  <span class="heart">❤️</span>
+</div>
+
+<!-- Questions / Boxes -->
+<div class="question-box" id="box1">
+  <h1>Hi my little princess, how are you?</h1>
+  <div class="buttons">
+    <button id="sadBtn" class="no">I’m sad 😔</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="box2">
+  <h2>Let's play a game! Are you ready? If you win, you will win the gift 🎁</h2>
+  <div class="buttons">
+    <button class="answer">Yes I want to play</button>
+    <button class="answer">Sì voglio giocare</button>
+    <button class="answer">Да, я хочу играть</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="box3">
+  <h2 id="thirdQText"></h2>
+  <div class="buttons" id="thirdButtons"></div>
+</div>
+
+<div class="question-box hidden" id="box4">
+  <h2>You can’t close your eyes or you will lose 👀</h2>
+  <div class="buttons">
+    <button id="understandBtn" class="yes">Okay I understand!</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="videoBox">
+  <div id="videoContainer" style="margin-bottom: 20px;"></div>
+  <button id="nextAfterVideo" class="yes">Next</button>
+</div>
+
+<div class="question-box hidden" id="scareBox">
+  <h2>Did you get scared? haha 😏</h2>
+  <div class="buttons">
+    <button id="yesScare" class="yes">Yes</button>
+    <button id="noScare" class="no">No</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="genIntro">
+  <h2>Farò un test sulle tue conoscenze generali, quindi preparati!</h2>
+  <div class="buttons">
+    <button id="genNext" class="yes">Next</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="genQ1">
+  <h2>Which is the largest continent by area?</h2>
+  <div class="buttons">
+    <button>A) SOUTH AMERICA</button>
+    <button>B) NORTH AMERICA</button>
+    <button>C) KENYA</button>
+    <button>D) ASIA</button>
+    <button>E) AFRICA (DON'T CHOOSE THIS IS WRONG)</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="wrongOnly">
+  <h2>Only choose the wrong answer!!!!</h2>
+  <div class="buttons">
+    <button>A) IM RIGHT CHOOSE ME</button>
+    <button>B) IM WRONG DONT CHOOSE ME</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="timeZones">
+  <h2>Which country has the most number of time zones?</h2>
+  <div class="hint-box">Hint: baguette 🥖</div>
+  <div class="buttons">
+    <button>A) FRANCE</button>
+    <button>B) SUDAN</button>
+    <button>C) JAPAN</button>
+    <button>D) GREECE</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="kissQ">
+  <h2>Let's take a little break and give me a hard kiss 😘</h2>
+  <div class="buttons">
+    <button id="kissBtn" class="yes">Yes Daddy</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="gifBox">
+  <h2>Here’s a little surprise for you! 🎉</h2>
+  <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExNGNydnhuMmIybzl3bm5oamdtODl2cmk4cTlvZ283ZzMxdmhkbHRsMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l8knrqScC58V5Gc5g0/giphy.gif" alt="fun gif" style="width:100%; border-radius:15px; margin-bottom:20px;">
+  <button id="nextAfterGif" class="yes">Next</button>
+</div>
+
+<div class="question-box hidden" id="hardestSubstance">
+  <h2>Qual è la sostanza naturale più dura sulla Terra?</h2>
+  <div class="buttons">
+    <button>A) GOLD</button>
+    <button>B) SILVER</button>
+    <button>C) Me when i see you 😏🍆</button>
+    <button>D) Diamonds</button>
+    <button>E) C AND E ARE CORRECT</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="firstTalkDate">
+  <h2>What was the date that we first talked to each other?</h2>
+  <div class="buttons">
+    <button id="clickNextDate" class="yes">Click Next when you say it on the call</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="areYouSureBox">
+  <div class="buttons">
+    <button id="areYouSure" class="yes">Are you sure?</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="goodJobBox">
+  <h2>GOOD JOB BABY!!</h2>
+  <div class="buttons">
+    <button id="yaaaayBtn" class="yes">YAAAAAAAAY!</button>
+  </div>
+</div>
+
+<div class="question-box hidden" id="attackBox">
+  <h2>Will you finish Attack on Titan with me?</h2>
+  <div class="buttons">
+    <button id="yesAttack" class="yes">YES</button>
+    <button id="noAttack" class="no">No vaffanculo, your anime is for kids</button>
+  </div>
+</div>
+
+<!-- Candy Catch -->
+<div class="question-box hidden" id="candyIntro">
+  <h2>Catch the candy! 🍬</h2>
+  <div class="buttons">
+    <button id="startCandyBtn" class="yes">Okay!</button>
+  </div>
+</div>
+<div class="question-box hidden" id="candyBox">
+  <div id="candyContainer"></div>
+  <p>Catch 10 candies to get an extra heart!</p>
+</div>
+
+<!-- New Box after Candy -->
+<div class="question-box hidden" id="lastGameIntro">
+  <h2>Good job baby! Are you ready for your last game? 😘🎉</h2>
+  <div class="buttons">
+    <button id="startMemoryBtn" class="yes">Yes I'm ready 😘🎉</button>
+  </div>
+</div>
+
+<!-- Memory Game -->
+<div class="question-box hidden" id="memoryGameBox">
+  <h2>Memory Game! Find all matching pairs 🃏</h2>
+  <div class="memory-grid" id="memoryGrid"></div>
+</div>
+
+<!-- Final Prize -->
+<div class="question-box hidden" id="prizeBox">
+  <h2>Congrats! You have won the prize! 🎁🥳</h2>
+</div>
+
+<script>
+// ---------- Sounds ----------
+const clickSnd = document.getElementById('clickSnd');
+const correctSnd = document.getElementById('correctSnd');
+const wrongSnd = document.getElementById('wrongSnd');
+const collectSnd = document.getElementById('collectSnd');
+
+function playClick(){clickSnd.play();}
+function playCorrect(){correctSnd.play();}
+function playWrong(){wrongSnd.play();}
+function playCollect(){collectSnd.play();}
+
+// ---------- Background Music ----------
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.2;
+const muteBtn = document.getElementById('muteBtn');
+let isMuted = false;
+muteBtn.addEventListener('click',()=>{isMuted = !isMuted; bgMusic.muted = isMuted; muteBtn.textContent = isMuted ? '🔇' : '🔈';});
+document.body.addEventListener('click', ()=>{if(bgMusic.paused){bgMusic.play();}},{once:true});
+
+// ---------- Hearts ----------
+let hearts = document.getElementById('hearts');
+function loseHeart(){
+  const heartSpans = hearts.querySelectorAll('.heart');
+  for(let i=heartSpans.length-1;i>=0;i--){
+    const h = heartSpans[i];
+    if(!h.classList.contains('lost')){
+      h.classList.add('lost');
+      playWrong();
+      h.addEventListener('animationend', ()=>{h.remove();
+        if(hearts.querySelectorAll('.heart').length === 0){alert("💔 Game Over! You lost all hearts!"); location.reload();}
+      });
+      return;
+    }
+  }
+}
+function addHeart(){
+  const newHeart = document.createElement('span');
+  newHeart.classList.add('heart');
+  newHeart.textContent = '❤️';
+  hearts.appendChild(newHeart);
+}
+
+// ---------- Box 1 ----------
+let sadBtn = document.getElementById('sadBtn');
+let box1 = document.getElementById('box1');
+let box2 = document.getElementById('box2');
+let sadClicks = 0;
+sadBtn.addEventListener('click', () => {
+  playClick(); sadClicks++;
+  const btnWidth = sadBtn.offsetWidth;
+  const btnHeight = sadBtn.offsetHeight;
+  const maxX = box1.offsetWidth - btnWidth - 20;
+  const maxY = box1.offsetHeight - btnHeight - 20;
+  const x = Math.random() * maxX;
+  const y = Math.random() * maxY;
+  sadBtn.style.transform = `translate(${x}px, ${y}px)`;
+  if(sadClicks >= 5) showGoodButton();
+});
+function showGoodButton(){
+  if(document.getElementById('goodBtn')) return;
+  let goodBtn = document.createElement('button');
+  goodBtn.id = "goodBtn";
+  goodBtn.textContent = "I feel good thank you!!!";
+  goodBtn.classList.add('yes','bounce');
+  goodBtn.addEventListener('click', () => {playCorrect(); box1.classList.add('hidden'); box2.classList.remove('hidden');});
+  box1.querySelector('.buttons').appendChild(goodBtn);
+}
+
+// ---------- Box 2 ----------
+document.querySelectorAll('#box2 .answer').forEach(btn=>{btn.addEventListener('click',()=>{playClick(); box2.classList.add('hidden'); startThirdSeries();});});
+
+// ---------- Box 3 ----------
+const questions = [
+  { text:"How much do you love me? ❤️", answers:["10/10","3.5/10","69/10 😏😏😏😏😏","1/10"], correct:2 },
+  { text:"What's 7 × 6?", answers:["40","48","44","42"], correct:3 },
+  { text:"Who is the monkey?", answers:["Ahmed","Margherita","A is correct"], correct:1 },
+  { text:"What's Ahmed's favorite color?", answers:["Black","White","Purple","Orange 🤦‍♂️"], correct:0 }
+];
+let currentQ = 0;
+let box3 = document.getElementById('box3');
+const thirdQText = document.getElementById('thirdQText');
+const thirdButtons = document.getElementById('thirdButtons');
+function startThirdSeries(){ box3.classList.remove('hidden'); loadQuestion(); }
+function loadQuestion(){
+  const q = questions[currentQ];
+  thirdQText.textContent = q.text;
+  thirdButtons.innerHTML = '';
+  q.answers.forEach((ans,i)=>{
+    let b = document.createElement('button');
+    b.textContent = ans;
+    b.addEventListener('click',()=>{
+      playClick();
+      if(i===q.correct){ playCorrect(); currentQ++;
+        if(currentQ<questions.length) loadQuestion();
+        else { box3.classList.add('hidden'); box4.classList.remove('hidden'); }
+      } else loseHeart();
+    });
+    thirdButtons.appendChild(b);
+  });
+}
+
+// ---------- Box 4 ----------
+const understandBtn = document.getElementById('understandBtn');
+const videoBox = document.getElementById('videoBox');
+const videoContainer = document.getElementById('videoContainer');
+const nextAfterVideo = document.getElementById('nextAfterVideo');
+const scareBox = document.getElementById('scareBox');
+
+understandBtn.addEventListener('click',()=>{playClick(); box4.classList.add('hidden'); videoBox.classList.remove('hidden');
+  videoContainer.innerHTML = `<div style="position:relative; width:100%; height:0; padding-bottom:56.25%;"><iframe src="https://streamable.com/e/7tntgq?loop=0&autoplay=1" style="position:absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="autoplay; fullscreen" allowfullscreen></iframe></div>`;});
+
+nextAfterVideo.addEventListener('click',()=>{playClick(); videoBox.classList.add('hidden'); scareBox.classList.remove('hidden');});
+
+// ---------- Scare ----------
+const yesScare = document.getElementById('yesScare');
+const noScare = document.getElementById('noScare');
+let shrinkCount = 0;
+noScare.addEventListener('click',()=>{playClick(); shrinkCount++; const scale = Math.max(0.2,1-shrinkCount*0.2); noScare.style.transform = `scale(${scale})`;});
+yesScare.addEventListener('click',()=>{playClick(); scareBox.classList.add('hidden'); genIntro.classList.remove('hidden');});
+
+// ---------- General Knowledge ----------
+const genIntro = document.getElementById('genIntro');
+const genNext = document.getElementById('genNext');
+const genQ1 = document.getElementById('genQ1');
+const wrongOnly = document.getElementById('wrongOnly');
+const timeZones = document.getElementById('timeZones');
+const kissQ = document.getElementById('kissQ');
+const kissBtn = document.getElementById('kissBtn');
+const gifBox = document.getElementById('gifBox');
+const nextAfterGif = document.getElementById('nextAfterGif');
+const hardestSubstanceDiv = document.getElementById('hardestSubstance');
+const firstTalkDate = document.getElementById('firstTalkDate');
+const clickNextDate = document.getElementById('clickNextDate');
+const areYouSureBox = document.getElementById('areYouSureBox');
+const areYouSure = document.getElementById('areYouSure');
+const goodJobBox = document.getElementById('goodJobBox');
+const yaaaayBtn = document.getElementById('yaaaayBtn');
+const attackBox = document.getElementById('attackBox');
+const yesAttack = document.getElementById('yesAttack');
+const noAttack = document.getElementById('noAttack');
+
+// ---------- Sequence ----------
+genNext.addEventListener('click',()=>{ playClick(); genIntro.classList.add('hidden'); genQ1.classList.remove('hidden'); });
+genQ1.querySelectorAll('button').forEach((btn,i)=>{btn.addEventListener('click',()=>{playClick(); if(i===3){ genQ1.classList.add('hidden'); wrongOnly.classList.remove('hidden'); } else loseHeart();});});
+wrongOnly.querySelectorAll('button').forEach((btn,i)=>{btn.addEventListener('click',()=>{playClick(); if(i===1){ wrongOnly.classList.add('hidden'); timeZones.classList.remove('hidden'); } else loseHeart();});});
+timeZones.querySelectorAll('button').forEach((btn,i)=>{if(i===0){ btn.addEventListener('click',()=>{ playClick(); timeZones.classList.add('hidden'); kissQ.classList.remove('hidden'); }); } else btn.addEventListener('click',loseHeart);});
+kissBtn.addEventListener('click',()=>{ playClick(); kissQ.classList.add('hidden'); gifBox.classList.remove('hidden'); });
+nextAfterGif.addEventListener('click',()=>{ playClick(); gifBox.classList.add('hidden'); hardestSubstanceDiv.classList.remove('hidden'); });
+hardestSubstanceDiv.querySelectorAll('button').forEach((btn,i)=>{btn.addEventListener('click',()=>{ playClick(); if(i===4){ hardestSubstanceDiv.classList.add('hidden'); firstTalkDate.classList.remove('hidden'); } else loseHeart(); });});
+clickNextDate.addEventListener('click',()=>{ playClick(); firstTalkDate.classList.add('hidden'); areYouSureBox.classList.remove('hidden'); });
+areYouSure.addEventListener('click',()=>{ playClick(); areYouSureBox.classList.add('hidden'); goodJobBox.classList.remove('hidden'); });
+yaaaayBtn.addEventListener('click',()=>{ playClick(); goodJobBox.classList.add('hidden'); attackBox.classList.remove('hidden'); });
+yesAttack.addEventListener('click',()=>{ playClick(); attackBox.classList.add('hidden'); candyIntro.classList.remove('hidden'); });
+noAttack.addEventListener('click',()=>{ loseHeart(); });
+
+// ---------- Candy Catch ----------
+const startCandyBtn = document.getElementById('startCandyBtn');
+const candyContainer = document.getElementById('candyContainer');
+const candyBox = document.getElementById('candyBox');
+const candyIntro = document.getElementById('candyIntro');
+const lastGameIntro = document.getElementById('lastGameIntro');
+const startMemoryBtn = document.getElementById('startMemoryBtn');
+const memoryGameBox = document.getElementById('memoryGameBox');
+const memoryGrid = document.getElementById('memoryGrid');
+const prizeBox = document.getElementById('prizeBox');
+
+startCandyBtn.addEventListener('click',()=>{playClick(); candyIntro.classList.add('hidden'); candyBox.classList.remove('hidden'); startCandyGame();});
+
+function startCandyGame(){
+  let candiesCaught = 0; const maxCandies = 10;
+  const candyInterval = setInterval(()=>{
+    const candy = document.createElement('div');
+    candy.textContent = '🍬';
+    candy.style.position = 'absolute';
+    candy.style.left = Math.random() * (candyContainer.offsetWidth - 30) + 'px';
+    candy.style.top = '-30px';
+    candy.style.fontSize = '30px';
+    candy.style.cursor = 'pointer';
+    candyContainer.appendChild(candy);
+    const fallSpeed = 2 + Math.random()*3;
+    const fall = setInterval(()=>{
+      let top = parseFloat(candy.style.top);
+      if(top < candyContainer.offsetHeight - 30){ candy.style.top = top + fallSpeed + 'px'; }
+      else { candy.remove(); clearInterval(fall); }
+    },20);
+    candy.addEventListener('click',()=>{
+      playCollect(); candiesCaught++; candy.remove(); clearInterval(fall);
+      if(candiesCaught >= maxCandies){
+        clearInterval(candyInterval); addHeart();
+        candyBox.classList.add('hidden');
+        lastGameIntro.classList.remove('hidden');
+      }
+    });
+  }, 800);
+}
+
+// ---------- Memory Game ----------
+startMemoryBtn.addEventListener('click',()=>{
+  playClick(); lastGameIntro.classList.add('hidden'); memoryGameBox.classList.remove('hidden');
+  startMemory();
+});
+
+function startMemory(){
+  const symbols = ['🍎','🍌','🍇','🍉','🍒','🥝','🍍','🍑','🍋','🍓'];
+  let cards = [...symbols, ...symbols]; // 20 cards
+  cards = cards.sort(()=>Math.random()-0.5);
+  memoryGrid.innerHTML = '';
+  let firstCard = null, secondCard = null, lock = false, matches = 0;
+  cards.forEach(symbol=>{
+    const card = document.createElement('div');
+    card.classList.add('memory-card');
+    card.textContent = '';
+    card.dataset.symbol = symbol;
+    card.addEventListener('click',()=>{
+      if(lock || card.classList.contains('flipped')) return;
+      card.classList.add('flipped');
+      card.textContent = symbol;
+      if(!firstCard) firstCard = card;
+      else {
+        secondCard = card;
+        lock = true;
+        setTimeout(()=>{
+          if(firstCard.dataset.symbol === secondCard.dataset.symbol){
+            matches +=2;
+            firstCard.style.visibility = 'hidden';
+            secondCard.style.visibility = 'hidden';
+          } else {
+            firstCard.classList.remove('flipped'); secondCard.classList.remove('flipped');
+            firstCard.textContent = ''; secondCard.textContent = '';
+          }
+          firstCard = null; secondCard = null; lock = false;
+          if(matches === 20){ memoryGameBox.classList.add('hidden'); prizeBox.classList.remove('hidden'); }
+        },800);
+      }
+    });
+    memoryGrid.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
